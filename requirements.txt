@@ -1,0 +1,13 @@
+# AI Employee Bronze Tier — Python Dependencies
+
+# File system watcher (Bronze Tier - required)
+watchdog>=4.0.0
+
+# Gmail API (optional - only needed for gmail_watcher.py)
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.0.0
+
+# WhatsApp automation via Playwright (Silver Tier)
+playwright>=1.40.0

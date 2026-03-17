@@ -1,0 +1,35 @@
+# Secrets - NEVER commit these
+.env
+*.env
+credentials.json
+gmail_token.json
+token.json
+*_token.json
+*_credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node
+node_modules/
+
+# Logs (optional - remove if you want to track logs in git)
+# vault/Logs/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
