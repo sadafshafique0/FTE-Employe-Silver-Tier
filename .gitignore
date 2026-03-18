@@ -17,8 +17,12 @@ watchers/whatsapp_session/
 vault/Needs_Action/EMAIL_*.md
 vault/Needs_Action/WHATSAPP_*.md
 vault/Needs_Action/LINKEDIN_*.md
+vault/Done/EMAIL_*.md
+vault/Done/WHATSAPP_*.md
 vault/Logs/
 vault/Done/LINKEDIN_POST_test_*.md
+vault/.obsidian/workspace.json
+.claude/settings.local.json
 
 # Python
 __pycache__/
