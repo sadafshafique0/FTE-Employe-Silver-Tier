@@ -256,6 +256,7 @@ class GmailWatcher(BaseWatcher):
                 suggested_actions.append(f"- [ ] Unsubscribe: {unsub_link}")
             else:
                 suggested_actions.append("- [ ] Unsubscribe (find link in email body)")
+            suggested_actions.append("- [ ] Move to spam")
             suggested_actions.append("- [ ] Delete this email")
         else:
             suggested_actions.append("- [ ] Reply to sender")

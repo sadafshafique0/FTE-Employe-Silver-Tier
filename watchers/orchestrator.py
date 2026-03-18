@@ -116,10 +116,24 @@ def get_gmail_service():
         return None
 
 
+def get_message_id(content: str) -> str:
+    """Extract Gmail message_id from vault file frontmatter."""
+    for line in content.split("\n"):
+        if line.startswith("message_id:"):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+def move_vault_file_to_done(f: Path, done_dir: Path):
+    done_path = done_dir / f.name
+    f.rename(done_path)
+    logger.info(f"Moved to Done: {f.name}")
+
+
 def scan_needs_action_for_deletions(vault_path: Path, dry_run: bool):
     """
-    Scan Needs_Action files for checked '- [x] Delete this email' boxes.
-    Trashes the email in Gmail and moves the vault file to Done/.
+    Scan Needs_Action for checked '- [x] Delete this email' or '- [x] Move to spam'.
+    Executes the Gmail action and moves the vault file to Done/.
     """
     needs_action = vault_path / "Needs_Action"
     done_dir = vault_path / "Done"
@@ -127,51 +141,54 @@ def scan_needs_action_for_deletions(vault_path: Path, dry_run: bool):
         return
 
     gmail = get_gmail_service()
-    deleted = 0
+    processed = 0
 
     for f in needs_action.glob("EMAIL_*.md"):
         try:
             content = f.read_text(encoding="utf-8")
-            # Check if delete action is ticked: - [x] Delete this email
-            if "- [x] Delete this email" not in content:
+            delete_checked = "- [x] Delete this email" in content
+            spam_checked = "- [x] Move to spam" in content
+
+            if not delete_checked and not spam_checked:
                 continue
 
-            # Extract message_id from frontmatter
-            message_id = None
-            for line in content.split("\n"):
-                if line.startswith("message_id:"):
-                    message_id = line.split(":", 1)[1].strip()
-                    break
+            message_id = get_message_id(content)
+            action_type = "email_delete" if delete_checked else "email_spam"
+            label = "Trashed" if delete_checked else "Marked as spam"
 
-            logger.info(f"Delete requested: {f.name} (Gmail ID: {message_id})")
+            logger.info(f"{label}: {f.name} (Gmail ID: {message_id})")
 
             if not dry_run and gmail and message_id:
                 try:
-                    gmail.users().messages().trash(userId="me", id=message_id).execute()
-                    logger.info(f"Trashed in Gmail: {message_id}")
+                    if delete_checked:
+                        gmail.users().messages().trash(userId="me", id=message_id).execute()
+                    else:
+                        gmail.users().messages().modify(
+                            userId="me",
+                            id=message_id,
+                            body={"addLabelIds": ["SPAM"], "removeLabelIds": ["INBOX"]},
+                        ).execute()
+                    logger.info(f"{label} in Gmail: {message_id}")
                 except HttpError as e:
-                    logger.error(f"Gmail trash failed for {message_id}: {e}")
+                    logger.error(f"Gmail action failed for {message_id}: {e}")
 
-            # Move vault file to Done
-            done_path = done_dir / f.name
-            f.rename(done_path)
-            logger.info(f"Moved to Done: {f.name}")
+            move_vault_file_to_done(f, done_dir)
 
             log_action(vault_path, {
                 "timestamp": datetime.now().isoformat(),
-                "action_type": "email_delete",
+                "action_type": action_type,
                 "file": f.name,
                 "gmail_id": message_id,
-                "result": "dry_run" if dry_run else "trashed",
+                "result": "dry_run" if dry_run else "success",
                 "actor": "orchestrator",
             })
-            deleted += 1
+            processed += 1
 
         except Exception as e:
-            logger.error(f"Error processing delete for {f.name}: {e}")
+            logger.error(f"Error processing {f.name}: {e}")
 
-    if deleted:
-        logger.info(f"Deleted {deleted} email(s) from Gmail and vault")
+    if processed:
+        logger.info(f"Processed {processed} email action(s) from Needs_Action")
 
 
 def process_email_send(filepath: Path, vault_path: Path, credentials_path: Path, dry_run: bool) -> bool:
