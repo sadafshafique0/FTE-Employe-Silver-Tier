@@ -1,11 +1,24 @@
 # Secrets - NEVER commit these
 .env
 *.env
+Credentials.json
 credentials.json
 gmail_token.json
+gmail_send_token.json
 token.json
 *_token.json
 *_credentials.json
+
+# Browser sessions (contain auth cookies)
+watchers/linkedin_session/
+watchers/whatsapp_session/
+
+# Vault runtime data (personal emails - not for version control)
+vault/Needs_Action/EMAIL_*.md
+vault/Needs_Action/WHATSAPP_*.md
+vault/Needs_Action/LINKEDIN_*.md
+vault/Logs/
+vault/Done/LINKEDIN_POST_test_*.md
 
 # Python
 __pycache__/
