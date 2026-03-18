@@ -1,21 +1,30 @@
-# Personal AI Employee — Bronze Tier
+# Personal AI Employee — Silver Tier
 
 > *Your life and business on autopilot. Local-first, agent-driven, human-in-the-loop.*
 
-A Bronze Tier implementation of the Personal AI Employee from the [Panaversity Hackathon](https://github.com/panaversity). Built with Claude Code + Obsidian vault architecture.
+A Silver Tier implementation of the Personal AI Employee from the [Panaversity Hackathon](https://github.com/panaversity). Built with Claude Code + Obsidian vault architecture.
 
 ---
 
-## What's Included (Bronze Tier)
+## What's Included (Silver Tier)
 
 | Deliverable | Status |
 |---|---|
 | Obsidian vault with `Dashboard.md` | ✅ |
 | `Company_Handbook.md` (rules of engagement) | ✅ |
-| Folder structure: Inbox / Needs_Action / Done | ✅ |
+| Folder structure: Inbox / Needs_Action / Done / Pending_Approval / Approved | ✅ |
 | File System Watcher script | ✅ |
-| Gmail Watcher script (optional) | ✅ |
+| Gmail Watcher script | ✅ |
+| Gmail MCP Server (Claude calls Gmail tools directly) | ✅ |
+| WhatsApp Web Watcher script | ✅ |
+| LinkedIn Watcher + Auto-poster script | ✅ |
+| Orchestrator (executes approved actions) | ✅ |
 | Agent Skill: `vault-manager` | ✅ |
+| Agent Skill: `gmail-sender` | ✅ |
+| Agent Skill: `linkedin-poster` | ✅ |
+| Agent Skill: `whatsapp-watcher` | ✅ |
+| Agent Skill: `scheduler` | ✅ |
+| Agent Skill: `browsing-with-playwright` | ✅ |
 | `CLAUDE.md` (AI Employee configuration) | ✅ |
 
 ---
@@ -31,7 +40,8 @@ python -m venv .venv
 # source .venv/bin/activate  # Mac/Linux
 
 # Install required packages
-pip install watchdog
+pip install watchdog playwright google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+playwright install chromium
 ```
 
 ### 2. Open vault in Obsidian
@@ -53,12 +63,34 @@ Claude will:
 - List items in `Needs_Action/`
 - Announce it's ready
 
-### 4. Start the File System Watcher
+### 4. Start the Watchers
 
-In a separate terminal:
+In separate terminals (or use the quick-start script):
 
 ```bash
+# File system watcher (always-on)
 python watchers/filesystem_watcher.py --vault ./vault
+
+# Gmail watcher
+python watchers/gmail_watcher.py --vault ./vault --credentials watchers/credentials.json
+
+# WhatsApp watcher (first time: scan QR)
+python watchers/whatsapp_watcher.py --vault ./vault --setup
+python watchers/whatsapp_watcher.py --vault ./vault
+
+# LinkedIn watcher (first time: log in)
+python watchers/linkedin_watcher.py --vault ./vault --setup
+python watchers/linkedin_watcher.py --vault ./vault
+
+# Orchestrator (executes approved actions)
+python watchers/orchestrator.py --vault ./vault --credentials watchers/credentials.json
+```
+
+Or use the quick-start script:
+
+```bash
+start_watchers.bat    # Windows
+bash start_watchers.sh  # Mac/Linux
 ```
 
 Now **drop any file into `vault/Inbox/`** — the watcher will automatically create a `Needs_Action` entry and Claude can process it.
@@ -117,19 +149,14 @@ Edit `vault/Business_Goals.md` to:
 
 ---
 
-## Optional: Gmail Watcher
+## Gmail Setup
 
-Requires Google API setup:
+Requires Google API credentials:
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable the Gmail API
 3. Download `credentials.json` to the `watchers/` folder
-4. Run:
-
-```bash
-pip install google-auth google-auth-oauthlib google-api-python-client
-python watchers/gmail_watcher.py --vault ./vault --credentials watchers/credentials.json
-```
+4. Run the Gmail watcher — it will prompt you to authenticate on first run
 
 > ⚠️ Never commit `credentials.json` or `gmail_token.json` to git. They're in `.gitignore`.
 
@@ -167,8 +194,8 @@ Gmail / File drops  →  Watcher Scripts  →  Needs_Action/
 
 | Tier | Features |
 |------|----------|
-| **Bronze ← You are here** | Vault + File Watcher + Claude reads/writes |
-| Silver | Gmail + WhatsApp + LinkedIn + Email MCP + Cron |
+| Bronze | Vault + File Watcher + Claude reads/writes |
+| **Silver ← You are here** | Gmail + WhatsApp + LinkedIn + Email MCP + Cron |
 | Gold | Full cross-domain + Odoo + Ralph Wiggum loop |
 | Platinum | Cloud 24/7 + Always-on + Local/Cloud split |
 
@@ -176,7 +203,7 @@ Gmail / File drops  →  Watcher Scripts  →  Needs_Action/
 
 ## Submission
 
-- **Tier:** Bronze
+- **Tier:** Silver
 - **Primary Tool:** Claude Code
 - **All AI functionality:** Implemented as Agent Skills (see `.claude/skills/`)
-- **Demo:** Drop a file in `vault/Inbox/`, run Claude, show Dashboard update
+- **Demo:** Drop a file in `vault/Inbox/`, run Claude, show Dashboard update; approve a LinkedIn post or email via file move
