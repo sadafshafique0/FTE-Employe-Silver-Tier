@@ -29,6 +29,18 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
+try:
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+    GMAIL_AVAILABLE = True
+except ImportError:
+    GMAIL_AVAILABLE = False
+
+GMAIL_TOKEN = Path(__file__).parent / "gmail_token.json"
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [Orchestrator] %(levelname)s: %(message)s",
@@ -86,6 +98,80 @@ def update_dashboard(vault_path: Path, message: str):
     if marker in content:
         content = content.replace(marker, marker + entry, 1)
         dashboard.write_text(content, encoding="utf-8")
+
+
+def get_gmail_service():
+    """Get Gmail service using existing watcher token."""
+    if not GMAIL_AVAILABLE:
+        return None
+    if not GMAIL_TOKEN.exists():
+        return None
+    try:
+        creds = Credentials.from_authorized_user_file(str(GMAIL_TOKEN), GMAIL_SCOPES)
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        return build("gmail", "v1", credentials=creds)
+    except Exception as e:
+        logger.warning(f"Could not load Gmail service: {e}")
+        return None
+
+
+def scan_needs_action_for_deletions(vault_path: Path, dry_run: bool):
+    """
+    Scan Needs_Action files for checked '- [x] Delete this email' boxes.
+    Trashes the email in Gmail and moves the vault file to Done/.
+    """
+    needs_action = vault_path / "Needs_Action"
+    done_dir = vault_path / "Done"
+    if not needs_action.exists():
+        return
+
+    gmail = get_gmail_service()
+    deleted = 0
+
+    for f in needs_action.glob("EMAIL_*.md"):
+        try:
+            content = f.read_text(encoding="utf-8")
+            # Check if delete action is ticked: - [x] Delete this email
+            if "- [x] Delete this email" not in content:
+                continue
+
+            # Extract message_id from frontmatter
+            message_id = None
+            for line in content.split("\n"):
+                if line.startswith("message_id:"):
+                    message_id = line.split(":", 1)[1].strip()
+                    break
+
+            logger.info(f"Delete requested: {f.name} (Gmail ID: {message_id})")
+
+            if not dry_run and gmail and message_id:
+                try:
+                    gmail.users().messages().trash(userId="me", id=message_id).execute()
+                    logger.info(f"Trashed in Gmail: {message_id}")
+                except HttpError as e:
+                    logger.error(f"Gmail trash failed for {message_id}: {e}")
+
+            # Move vault file to Done
+            done_path = done_dir / f.name
+            f.rename(done_path)
+            logger.info(f"Moved to Done: {f.name}")
+
+            log_action(vault_path, {
+                "timestamp": datetime.now().isoformat(),
+                "action_type": "email_delete",
+                "file": f.name,
+                "gmail_id": message_id,
+                "result": "dry_run" if dry_run else "trashed",
+                "actor": "orchestrator",
+            })
+            deleted += 1
+
+        except Exception as e:
+            logger.error(f"Error processing delete for {f.name}: {e}")
+
+    if deleted:
+        logger.info(f"Deleted {deleted} email(s) from Gmail and vault")
 
 
 def process_email_send(filepath: Path, vault_path: Path, credentials_path: Path, dry_run: bool) -> bool:
@@ -211,16 +297,18 @@ def run(vault_path: Path, credentials_path: Path, dry_run: bool, poll_interval: 
 
     while True:
         try:
+            # 1. Process approved actions (/Approved/ folder)
             action_files = [
                 f for f in approved_dir.glob("*.md")
                 if f.name != ".gitkeep"
                 and not f.name.startswith(".")
-                # LinkedIn posts are handled by linkedin_watcher
                 and not f.name.startswith("LINKEDIN_POST_")
             ]
-
             for f in action_files:
                 process_approved_file(f, vault_path, credentials_path, dry_run)
+
+            # 2. Scan Needs_Action for checked delete boxes
+            scan_needs_action_for_deletions(vault_path, dry_run)
 
         except KeyboardInterrupt:
             logger.info("Orchestrator stopped.")
