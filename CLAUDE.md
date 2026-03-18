@@ -32,8 +32,25 @@ the loop on sensitive actions.
 When asked to "process tasks", "check the vault", or "what needs action":
 - Read each `.md` file in `./vault/Needs_Action/`
 - For each item: read, classify, act or create a plan
+- **Simple task** (1 action, no external systems) → do it, move to `/Done/`
+- **Complex task** (2+ steps, external systems, or ambiguous) → create `Plan.md` first
 - Move processed files to `./vault/Done/`
 - Update `./vault/Dashboard.md`
+
+### 2. Reasoning Loop (Plan.md creation)
+For any multi-step or ambiguous task, use the reasoning loop:
+1. Reason through all required steps before acting
+2. Create `./vault/Plans/PLAN_<description>_YYYY-MM-DD.md` with checkbox steps
+3. Execute each step, check it off `[ ]` → `[x]`
+4. Steps requiring external action → create `/Pending_Approval/` file, pause
+5. Resume after human approves → continue through remaining steps
+6. Mark plan `status: completed` when all steps done
+
+Complexity triggers (always create Plan.md if any apply):
+- Task involves email, LinkedIn, payments, or any external system
+- Task has dependencies between steps
+- Task is ambiguous and needs clarification
+- User says "plan", "figure out how to", "research and then act"
 
 ### 2. Draft & Send Emails (gmail-sender skill)
 For email tasks:
@@ -74,12 +91,28 @@ After any work session, update `./vault/Dashboard.md`:
 
 ## Available Skills
 
-- **vault-manager** — All vault read/write/process operations
+- **vault-manager** — All vault read/write/process operations + Plan.md reasoning loop
 - **browsing-with-playwright** — Web automation for research tasks
 - **whatsapp-watcher** — Start/stop WhatsApp Web monitoring
 - **linkedin-poster** — Draft and post LinkedIn content for lead generation
 - **gmail-sender** — Draft and send emails via Gmail API
 - **scheduler** — Set up cron/Task Scheduler for automated recurring tasks
+
+## MCP Server (External Actions)
+
+Gmail is exposed as an MCP server (`watchers/email_mcp_server.py`) registered in
+`.claude/settings.json`. Claude can call Gmail tools directly:
+
+| Tool | Description |
+|---|---|
+| `send_email` | Send email via Gmail API |
+| `list_emails` | List inbox messages |
+| `get_email` | Fetch full email content |
+| `trash_email` | Move email to Trash |
+| `mark_spam` | Mark email as Spam |
+
+The MCP server starts automatically when Claude Code loads this project.
+Test it: `python watchers/email_mcp_server.py --test`
 
 ---
 

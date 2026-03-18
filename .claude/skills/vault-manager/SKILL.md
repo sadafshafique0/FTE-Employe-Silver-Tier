@@ -44,11 +44,36 @@ vault/
 ```
 1. Read the .md file to understand the task
 2. Determine priority (urgent / high / normal / low)
-3. For simple tasks: do the work, move file to /Done/
-4. For multi-step tasks: create a Plan.md in /Plans/
+3. Assess complexity:
+   - Simple (1 action, no external systems) → do it, move to /Done/
+   - Complex (2+ steps, external systems, or ambiguous) → create Plan.md first
+4. For multi-step tasks: create a Plan.md in /Plans/ (see reasoning loop below)
 5. For sensitive actions: create an approval file in /Pending_Approval/
 6. Update Dashboard.md with activity log entry
 ```
+
+### Reasoning Loop for Complex Tasks:
+
+When a task has 2+ steps, involves external systems, or is ambiguous, use this loop:
+
+```
+LOOP:
+  1. Read task → reason through all required steps
+  2. Create PLAN_<description>_YYYY-MM-DD.md with checkbox steps
+  3. Execute Step 1 → check it off [ ] → [x]
+  4. Execute Step 2 → check it off
+  5. If a step requires approval → create /Pending_Approval/ file → PAUSE loop
+  6. Resume loop when /Approved/ file appears
+  7. When all steps [x] → mark plan status: completed → move to /Done/
+END LOOP
+```
+
+**Complexity triggers** (always create a Plan.md if any apply):
+- Task involves sending email, posting on LinkedIn, or any external action
+- Task has dependencies (Step B requires Step A first)
+- Task is ambiguous and needs clarification before acting
+- Task affects more than one system or file
+- User says "plan", "strategy", "figure out how to", "research and then"
 
 ### Creating a Plan file:
 

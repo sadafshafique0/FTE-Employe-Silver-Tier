@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "gmail": {
+      "command": "python",
+      "args": ["watchers/email_mcp_server.py"],
+      "env": {
+        "GMAIL_CREDENTIALS": "Credentials.json",
+        "GMAIL_TOKEN": "watchers/gmail_send_token.json"
+      }
+    }
+  }
+}
