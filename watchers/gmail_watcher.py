@@ -55,6 +55,13 @@ HIGH_KEYWORDS = [
     "interview", "offer", "follow up", "follow-up", "important",
     "project", "client", "deliverable",
 ]
+NEWSLETTER_KEYWORDS = [
+    "unsubscribe", "newsletter", "digest", "weekly update", "monthly update",
+    "no-reply", "noreply", "donotreply", "do-not-reply", "marketing",
+    "promotion", "promotional", "opt out", "opt-out", "mailing list",
+    "you're receiving this", "you are receiving this", "manage preferences",
+    "email preferences", "update your preferences",
+]
 
 
 def get_gmail_service(credentials_path: str):
@@ -90,6 +97,39 @@ def classify_priority(subject: str, body: str, sender: str) -> str:
     if any(kw in text for kw in HIGH_KEYWORDS):
         return "high"
     return "normal"
+
+
+def is_newsletter(subject: str, body: str, sender: str, headers: dict) -> bool:
+    """Detect if the email is a newsletter or promotional mail."""
+    text = f"{subject} {body} {sender}".lower()
+    if any(kw in text for kw in NEWSLETTER_KEYWORDS):
+        return True
+    # Check List-Unsubscribe header — standard newsletter header
+    if headers.get("List-Unsubscribe") or headers.get("List-ID"):
+        return True
+    return False
+
+
+def extract_unsubscribe_link(body: str, headers: dict) -> str:
+    """Extract unsubscribe URL from email body or List-Unsubscribe header."""
+    # Check List-Unsubscribe header first (most reliable)
+    list_unsub = headers.get("List-Unsubscribe", "")
+    if list_unsub:
+        # Header format: <https://...>, <mailto:...>
+        urls = re.findall(r'<(https?://[^>]+)>', list_unsub)
+        if urls:
+            return urls[0]
+
+    # Fallback: scan body for unsubscribe links
+    unsub_pattern = re.compile(
+        r'(https?://[^\s<>"\']+(?:unsubscribe|optout|opt-out|remove)[^\s<>"\']*)',
+        re.IGNORECASE
+    )
+    matches = unsub_pattern.findall(body)
+    if matches:
+        return matches[0]
+
+    return ""
 
 
 def extract_email_body(payload: dict) -> str:
@@ -196,8 +236,10 @@ class GmailWatcher(BaseWatcher):
         if not body:
             body = snippet  # Fallback to snippet if body extraction fails
 
-        # Classify priority
+        # Classify priority and type
         priority = classify_priority(subject, body, sender)
+        newsletter = is_newsletter(subject, body, sender, headers)
+        unsub_link = extract_unsubscribe_link(body, headers) if newsletter else ""
 
         # Clean sender name for filename
         sender_name = re.sub(r"[^\w\s-]", "", sender.split("<")[0].strip())[:30]
@@ -205,6 +247,24 @@ class GmailWatcher(BaseWatcher):
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         md_path = self.needs_action / f"EMAIL_{safe_sender}_{timestamp}.md"
+
+        # Build suggested actions based on email type
+        suggested_actions = []
+        if newsletter:
+            suggested_actions.append("- [ ] **NEWSLETTER DETECTED**")
+            if unsub_link:
+                suggested_actions.append(f"- [ ] Unsubscribe: {unsub_link}")
+            else:
+                suggested_actions.append("- [ ] Unsubscribe (find link in email body)")
+            suggested_actions.append("- [ ] Delete this email")
+        else:
+            suggested_actions.append("- [ ] Reply to sender")
+            suggested_actions.append("- [ ] Forward to relevant party")
+            suggested_actions.append("- [ ] If reply needed: create approval file in /Pending_Approval/")
+            suggested_actions.append("- [ ] Delete this email")
+            suggested_actions.append("- [ ] Archive after processing")
+
+        actions_block = "\n".join(suggested_actions)
 
         md_content = f"""---
 type: email
@@ -216,6 +276,7 @@ subject: "{subject}"
 date: {date}
 received: {datetime.now().isoformat()}
 priority: {priority}
+is_newsletter: {str(newsletter).lower()}
 labels: {', '.join(label_ids)}
 status: pending
 ---
@@ -224,7 +285,7 @@ status: pending
 
 **From:** {sender}
 **Date:** {date}
-**Priority:** {priority.upper()}
+**Priority:** {priority.upper()}{"  |  📧 NEWSLETTER" if newsletter else ""}
 
 ### Body
 
@@ -232,10 +293,7 @@ status: pending
 
 ### Suggested Actions
 
-- [ ] Reply to sender
-- [ ] Forward to relevant party
-- [ ] If reply needed: create approval file in /Pending_Approval/
-- [ ] Archive after processing
+{actions_block}
 
 ---
 *Created automatically by GmailWatcher — Silver Tier*
